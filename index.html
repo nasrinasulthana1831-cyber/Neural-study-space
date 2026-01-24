@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2d5a4a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Study Planner — Plan, Track, Succeed</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ========== AUTH SCREENS ========== -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1 class="auth-logo">Study Planner</h1>
+        <p class="auth-tag">Plan your subjects. Track your tasks. Study smarter.</p>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form">
+        <h2>Welcome back</h2>
+        <div class="input-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" placeholder="you@example.com" required>
+        </div>
+        <div class="input-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" required>
+        </div>
+        <p id="login-error" class="form-error"></p>
+        <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        <p class="auth-switch">Don't have an account? <a href="#" id="show-signup">Sign up</a></p>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signup-form" class="auth-form hidden">
+        <h2>Create account</h2>
+        <div class="input-group">
+          <label for="signup-name">Name</label>
+          <input type="text" id="signup-name" placeholder="Your name" required>
+        </div>
+        <div class="input-group">
+          <label for="signup-email">Email</label>
+          <input type="email" id="signup-email" placeholder="you@example.com" required>
+        </div>
+        <div class="input-group">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" placeholder="At least 6 characters" required minlength="6">
+        </div>
+        <p id="signup-error" class="form-error"></p>
+        <button type="submit" class="btn btn-primary btn-block">Create account</button>
+        <p class="auth-switch">Already have an account? <a href="#" id="show-login">Sign in</a></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========== MAIN APP (after login) ========== -->
+  <div id="app-screen" class="app-screen hidden">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="sidebar-logo">Study Planner</h1>
+        <p class="sidebar-user" id="user-name">Student</p>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+        <a href="#" class="nav-item" data-view="subjects">
+          <span class="nav-icon">📚</span> Subjects
+        </a>
+        <a href="#" class="nav-item" data-view="tasks">
+          <span class="nav-icon">✓</span> Tasks
+        </a>
+        <a href="#" class="nav-item" data-view="ai">
+          <span class="nav-icon">✨</span> AI Assistant
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button type="button" class="btn btn-ghost btn-block" id="btn-logout">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <!-- Dashboard View -->
+      <div id="view-dashboard" class="view active">
+        <header class="view-header">
+          <h2>Dashboard</h2>
+          <p class="view-desc">Your study overview</p>
+        </header>
+        <div class="dashboard-grid">
+          <div class="stat-card">
+            <span class="stat-value" id="stat-subjects">0</span>
+            <span class="stat-label">Subjects</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-tasks">0</span>
+            <span class="stat-label">Total tasks</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-completed">0</span>
+            <span class="stat-label">Completed</span>
+          </div>
+          <div class="stat-card accent">
+            <span class="stat-value" id="stat-due">0</span>
+            <span class="stat-label">Due soon</span>
+          </div>
+        </div>
+        <section class="section-block">
+          <h3>Due soon</h3>
+          <div id="dashboard-due-list" class="task-list-mini"></div>
+          <p id="dashboard-due-empty" class="empty-msg">No upcoming deadlines.</p>
+        </section>
+      </div>
+
+      <!-- Subjects View -->
+      <div id="view-subjects" class="view">
+        <header class="view-header">
+          <h2>Subjects</h2>
+          <p class="view-desc">Add and manage your subjects</p>
+          <button type="button" class="btn btn-primary" id="btn-add-subject">+ Add subject</button>
+        </header>
+        <div id="subjects-list" class="cards-grid"></div>
+        <p id="subjects-empty" class="empty-msg hidden">No subjects yet. Add your first subject to get started.</p>
+
+        <!-- Add/Edit Subject Modal -->
+        <div id="subject-modal" class="modal">
+          <div class="modal-inner">
+            <h3 id="subject-modal-title">Add subject</h3>
+            <form id="subject-form">
+              <input type="hidden" id="subject-id">
+              <div class="input-group">
+                <label for="subject-name">Subject name</label>
+                <input type="text" id="subject-name" placeholder="e.g. Mathematics" required>
+              </div>
+              <div class="input-group">
+                <label>Color</label>
+                <div class="color-picker" id="subject-color-picker"></div>
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="subject-cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks View -->
+      <div id="view-tasks" class="view">
+        <header class="view-header">
+          <h2>Tasks</h2>
+          <p class="view-desc">Tasks by subject. Set deadlines and mark complete.</p>
+          <button type="button" class="btn btn-primary" id="btn-add-task">+ Add task</button>
+        </header>
+        <div class="tasks-toolbar">
+          <div class="input-group inline">
+            <label for="filter-subject">Subject</label>
+            <select id="filter-subject">
+              <option value="">All subjects</option>
+            </select>
+          </div>
+          <div class="filter-tabs">
+            <button type="button" class="filter-tab active" data-filter="all">All</button>
+            <button type="button" class="filter-tab" data-filter="pending">Pending</button>
+            <button type="button" class="filter-tab" data-filter="completed">Completed</button>
+          </div>
+        </div>
+        <div id="tasks-list" class="task-list"></div>
+        <p id="tasks-empty" class="empty-msg hidden">No tasks yet. Add a task to a subject.</p>
+
+        <!-- Add/Edit Task Modal -->
+        <div id="task-modal" class="modal">
+          <div class="modal-inner">
+            <h3 id="task-modal-title">Add task</h3>
+            <form id="task-form">
+              <input type="hidden" id="task-id">
+              <div class="input-group">
+                <label for="task-title">Task title</label>
+                <input type="text" id="task-title" placeholder="e.g. Complete Ch.5 exercises" required>
+              </div>
+              <div class="input-group">
+                <label for="task-subject">Subject</label>
+                <select id="task-subject" required></select>
+              </div>
+              <div class="input-group">
+                <label for="task-deadline">Deadline</label>
+                <input type="datetime-local" id="task-deadline">
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="task-cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Assistant View -->
+      <div id="view-ai" class="view">
+        <header class="view-header">
+          <h2>AI Study Assistant</h2>
+          <p class="view-desc">Smart suggestions based on your subjects and deadlines</p>
+        </header>
+        <div class="ai-panel">
+          <div class="ai-header">
+            <span class="ai-badge">✨ AI</span>
+            <h3>Today's focus</h3>
+          </div>
+          <div id="ai-suggestions" class="ai-suggestions"></div>
+          <div class="ai-tips">
+            <h4>Study tips</h4>
+            <ul id="ai-tips-list"></ul>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Main" role="navigation">
+      <a href="#" class="bottom-nav-item active" data-view="dashboard"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+      <a href="#" class="bottom-nav-item" data-view="subjects"><span class="nav-icon">📚</span><span>Subjects</span></a>
+      <a href="#" class="bottom-nav-item" data-view="tasks"><span class="nav-icon">✓</span><span>Tasks</span></a>
+      <a href="#" class="bottom-nav-item" data-view="ai"><span class="nav-icon">✨</span><span>AI</span></a>
+    </nav>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
