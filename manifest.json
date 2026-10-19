@@ -1,15 +1,14 @@
 {
-  "name": "Study Planner",
-  "short_name": "Study Planner",
-  "description": "Plan subjects, track tasks, set deadlines, and get AI study tips.",
+  "name": "Neural Study Space",
+  "short_name": "Neural Space",
+  "description": "A connected learning universe for your subjects, study sessions, and next steps.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f2f5fc",
-  "theme_color": "#172746",
+  "background_color": "#080b18",
+  "theme_color": "#080b18",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icons/study-planner.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

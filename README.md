@@ -1,8 +1,10 @@
-# Study Planner
+# Neural Study Space
 
-A static, responsive study planner PWA. It keeps accounts, subjects, and tasks in the current browser's local storage. The AI Study Assistant includes a clearly labelled local demo mode and can call a separately hosted backend when configured.
+A static, responsive AI study planner PWA. Its learning-space identity combines a live Three.js neural network, ambient information particles, orbital rings, a connected daily study dashboard, and interactive focus actions. It keeps accounts, subjects, and tasks in the current browser's local storage. The AI Study Assistant includes a clearly labelled local demo mode and can call a separately hosted backend when configured.
 
-The sign-in screen includes a custom Three.js study scene loaded as an ES module from jsDelivr. An internet connection is needed the first time the scene loads; the service worker caches the library after it loads. A CSS illustration remains available if WebGL or the CDN is unavailable.
+The app opens in a midnight theme; use the theme control in the top bar to switch between dark and light mode. The theme is saved in this browser. Use the planner search to find pages, subjects, and tasks; press `Ctrl+K` (or `/` when you are not typing) to focus it. Selecting a subject or task takes you to its entry in the planner. The dashboard's focus-sprint and study-guide actions open the existing focus timer and assistant.
+
+The Three.js learning universe is rendered across the sign-in and planner screens. It responds subtly to pointer movement, reduces detail on small screens, respects reduced-motion preferences, and can emit a visual pulse when a focus sprint starts. The module and Three.js are loaded from jsDelivr; an internet connection is needed the first time the scene loads. The rest of the planner remains available if WebGL or the CDN is unavailable.
 
 The dashboard derives its plan, deadline calendar, and subject progress from your existing tasks and subjects. The optional 25-minute focus timer records only completed sessions in a separate `studyPlanner_sessions` browser-local storage key; those records power the focused-time and streak metrics. Existing account, subject, and task records are not migrated or replaced.
 

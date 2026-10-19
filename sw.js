@@ -1,4 +1,4 @@
-const CACHE = 'study-planner-v4';
+const CACHE = 'study-planner-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,7 @@ const ASSETS = [
   './study-scene.js',
   './script.js',
   './manifest.json',
-  './icons/icon-192.png'
+  './icons/study-planner.svg'
 ];
 
 self.addEventListener('install', e => {

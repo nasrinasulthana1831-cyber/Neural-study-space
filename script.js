@@ -4,7 +4,8 @@ const STORAGE = {
   subjects: 'studyPlanner_subjects',
   tasks: 'studyPlanner_tasks',
   sessions: 'studyPlanner_sessions',
-  current: 'studyPlanner_currentUser'
+  current: 'studyPlanner_currentUser',
+  theme: 'studyPlanner_theme'
 };
 
 // Set this to your server endpoint; never put a model API key in this file.
@@ -450,6 +451,17 @@ function renderDashboard() {
   document.getElementById('stat-due').textContent = dueSoon.length;
   document.getElementById('stat-focus-minutes').textContent = sessionStats.minutes;
   document.getElementById('stat-streak').textContent = sessionStats.streak;
+  const heroPresence = document.getElementById('hero-presence-copy');
+  if (heroPresence) {
+    if (subjects.length === 0) {
+      heroPresence.textContent = 'Add a subject to open your first learning orbit';
+    } else if (tasks.filter(task => !task.completed).length === 0) {
+      heroPresence.textContent = `${subjects.length} learning orbit${subjects.length === 1 ? '' : 's'} · space to begin something new`;
+    } else {
+      const openTasks = tasks.filter(task => !task.completed).length;
+      heroPresence.textContent = `${subjects.length} learning orbit${subjects.length === 1 ? '' : 's'} · ${openTasks} open question${openTasks === 1 ? '' : 's'}`;
+    }
+  }
 
   const list = document.getElementById('dashboard-due-list');
   const empty = document.getElementById('dashboard-due-empty');
@@ -630,6 +642,7 @@ function toggleFocusSession() {
   }
   if (focusRemaining === 0) focusRemaining = focusDuration;
   document.getElementById('focus-session-status').textContent = '';
+  window.dispatchEvent(new Event('study-space-pulse'));
   focusInterval = window.setInterval(() => {
     focusRemaining = Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000));
     if (focusRemaining <= 0) finishFocusSession();
@@ -665,6 +678,7 @@ function renderSubjects() {
       const done = userTasks().filter(t => t.subjectId === s.id && t.completed).length;
       const card = document.createElement('div');
       card.className = 'subject-card';
+      card.dataset.subjectId = s.id;
       card.style.borderLeftColor = s.color;
       card.innerHTML = `
         <div class="name">${escapeHtml(s.name)}</div>
@@ -708,6 +722,7 @@ function renderTasks() {
       const overdue = t.deadline && !t.completed && new Date(t.deadline) < now;
       const row = document.createElement('div');
       row.className = 'task-row' + (t.completed ? ' completed' : '') + (overdue ? ' overdue' : '');
+      row.dataset.taskId = t.id;
       row.innerHTML = `
         <div class="task-check" data-id="${t.id}" role="button" aria-label="Toggle complete">${t.completed ? '✓' : ''}</div>
         <div class="task-body">
@@ -838,19 +853,256 @@ function setView(name) {
   const n = document.querySelector(`.nav-item[data-view="${name}"]`);
   const bn = document.querySelector(`.bottom-nav-item[data-view="${name}"]`);
   if (v) v.classList.add('active');
-  if (n) n.classList.add('active');
-  if (bn) bn.classList.add('active');
+  if (n) {
+    n.classList.add('active');
+    n.setAttribute('aria-current', 'page');
+  }
+  if (bn) {
+    bn.classList.add('active');
+    bn.setAttribute('aria-current', 'page');
+  }
+  document.querySelectorAll(`.nav-item:not([data-view="${name}"])`).forEach(item => item.removeAttribute('aria-current'));
+  document.querySelectorAll(`.bottom-nav-item:not([data-view="${name}"])`).forEach(item => item.removeAttribute('aria-current'));
   renderAll();
+}
+
+function applyTheme(theme) {
+  const selectedTheme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = selectedTheme;
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) {
+    const nextTheme = selectedTheme === 'dark' ? 'light' : 'dark';
+    toggle.setAttribute('aria-label', `Switch to ${nextTheme} theme`);
+    toggle.title = `Switch to ${nextTheme} theme`;
+    document.getElementById('theme-toggle-label').textContent = `${nextTheme[0].toUpperCase()}${nextTheme.slice(1)} mode`;
+  }
+}
+
+function closeGlobalSearch() {
+  const input = document.getElementById('global-search-input');
+  const results = document.getElementById('global-search-results');
+  results.classList.add('hidden');
+  input.setAttribute('aria-expanded', 'false');
+  input.removeAttribute('aria-activedescendant');
+}
+
+function renderGlobalSearch(value) {
+  const input = document.getElementById('global-search-input');
+  const results = document.getElementById('global-search-results');
+  const query = value.trim().toLowerCase();
+  results.replaceChildren();
+  input.removeAttribute('aria-activedescendant');
+  if (!query) {
+    closeGlobalSearch();
+    return;
+  }
+
+  const pages = [
+    { type: 'page', id: 'dashboard', title: 'Dashboard', detail: 'Your study overview' },
+    { type: 'page', id: 'subjects', title: 'Subjects', detail: 'Manage your subjects' },
+    { type: 'page', id: 'tasks', title: 'Tasks', detail: 'Browse and organize tasks' },
+    { type: 'page', id: 'ai', title: 'AI Study Assistant', detail: 'Get help with your study plan' }
+  ];
+  const matches = pages
+    .filter(item => `${item.title} ${item.detail}`.toLowerCase().includes(query))
+    .map(item => ({ ...item, group: 'Pages' }));
+
+  userSubjects().forEach(subject => {
+    const tasks = userTasks().filter(task => task.subjectId === subject.id);
+    if (`${subject.name} subject`.toLowerCase().includes(query)) {
+      matches.push({
+        type: 'subject',
+        id: subject.id,
+        title: subject.name,
+        detail: `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`,
+        group: 'Subjects'
+      });
+    }
+    tasks.forEach(task => {
+      const subjectName = subject.name;
+      if (`${task.title} ${subjectName}`.toLowerCase().includes(query)) {
+        matches.push({
+          type: 'task',
+          id: task.id,
+          title: task.title,
+          detail: `${subjectName}${task.completed ? ' · Completed' : ''}`,
+          group: 'Tasks'
+        });
+      }
+    });
+  });
+
+  const visibleMatches = matches.slice(0, 10);
+  if (visibleMatches.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'search-empty';
+    empty.setAttribute('role', 'status');
+    empty.textContent = `No matches for “${value.trim()}”. Try a task, subject, or page name.`;
+    results.appendChild(empty);
+  } else {
+    let currentGroup = '';
+    visibleMatches.forEach((match, index) => {
+      if (match.group !== currentGroup) {
+        currentGroup = match.group;
+        const heading = document.createElement('p');
+        heading.className = 'search-group';
+        heading.textContent = currentGroup;
+        results.appendChild(heading);
+      }
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.id = `global-search-option-${index}`;
+      option.className = 'search-option';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', 'false');
+      option.dataset.index = index;
+      option.dataset.type = match.type;
+      option.dataset.id = match.id;
+      const copy = document.createElement('span');
+      copy.className = 'search-option-copy';
+      const title = document.createElement('strong');
+      title.textContent = match.title;
+      const detail = document.createElement('small');
+      detail.textContent = match.detail;
+      copy.append(title, detail);
+      const type = document.createElement('span');
+      type.className = 'search-option-type';
+      type.textContent = match.type === 'page' ? 'Open' : 'View';
+      option.append(copy, type);
+      results.appendChild(option);
+    });
+  }
+
+  results.classList.remove('hidden');
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function activateGlobalSearchResult(option) {
+  const { type, id: resultId } = option.dataset;
+  closeGlobalSearch();
+  document.getElementById('global-search-input').value = '';
+  if (type === 'page') {
+    setView(resultId);
+    return;
+  }
+
+  const view = type === 'subject' ? 'subjects' : 'tasks';
+  setView(view);
+  if (type === 'subject') {
+    const card = document.querySelector(`[data-subject-id="${CSS.escape(resultId)}"]`);
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (card) {
+      card.classList.add('search-highlight');
+      window.setTimeout(() => card.classList.remove('search-highlight'), 1500);
+    }
+    return;
+  }
+
+  document.querySelector('.filter-tab[data-filter="all"]')?.click();
+  const subjectFilter = document.getElementById('filter-subject');
+  subjectFilter.value = '';
+  renderTasks();
+  const row = document.querySelector(`[data-task-id="${CSS.escape(resultId)}"]`);
+  row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (row) {
+    row.classList.add('search-highlight');
+    window.setTimeout(() => row.classList.remove('search-highlight'), 1500);
+  }
+}
+
+function setSearchActiveOption(index) {
+  const input = document.getElementById('global-search-input');
+  const options = [...document.querySelectorAll('#global-search-results .search-option')];
+  if (options.length === 0) return;
+  const activeIndex = (index + options.length) % options.length;
+  options.forEach((option, optionIndex) => {
+    const active = optionIndex === activeIndex;
+    option.setAttribute('aria-selected', String(active));
+    if (active) {
+      input.setAttribute('aria-activedescendant', option.id);
+      option.scrollIntoView({ block: 'nearest' });
+    }
+  });
 }
 
 /* ========== Event wiring ========== */
 document.addEventListener('DOMContentLoaded', () => {
+  applyTheme(localStorage.getItem(STORAGE.theme) || 'dark');
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(error => {
+      console.warn('Offline support could not be enabled.', error);
+    });
   }
   loadSession();
   initializeAIChat();
   updateFocusTimer();
+
+  document.getElementById('global-search-input')?.addEventListener('input', event => {
+    renderGlobalSearch(event.currentTarget.value);
+  });
+  document.getElementById('global-search-input')?.addEventListener('focus', event => {
+    if (event.currentTarget.value.trim()) renderGlobalSearch(event.currentTarget.value);
+  });
+  document.getElementById('global-search-input')?.addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const options = [...document.querySelectorAll('#global-search-results .search-option')];
+      const active = options
+        .findIndex(option => option.getAttribute('aria-selected') === 'true');
+      const next = active < 0
+        ? (event.key === 'ArrowDown' ? 0 : options.length - 1)
+        : active + (event.key === 'ArrowDown' ? 1 : -1);
+      setSearchActiveOption(next);
+    } else if (event.key === 'Enter') {
+      const active = document.querySelector('#global-search-results .search-option[aria-selected="true"]')
+        || document.querySelector('#global-search-results .search-option');
+      if (active) {
+        event.preventDefault();
+        activateGlobalSearchResult(active);
+      }
+    } else if (event.key === 'Escape') {
+      closeGlobalSearch();
+      event.currentTarget.blur();
+    }
+  });
+  document.getElementById('global-search-results')?.addEventListener('click', event => {
+    const option = event.target.closest('.search-option');
+    if (option) activateGlobalSearchResult(option);
+  });
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.global-search')) closeGlobalSearch();
+  });
+  document.addEventListener('keydown', event => {
+    const target = event.target;
+    const isTyping = target instanceof HTMLElement
+      && (target.isContentEditable || target.matches('input, textarea, select'));
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      document.getElementById('global-search-input').focus();
+    } else if (event.key === '/' && !isTyping && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      document.getElementById('global-search-input').focus();
+    }
+  });
+  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE.theme, nextTheme);
+    applyTheme(nextTheme);
+  });
+  document.getElementById('btn-topbar-add-task')?.addEventListener('click', () => {
+    setView('tasks');
+    openTaskModal();
+  });
+  document.getElementById('btn-hero-focus')?.addEventListener('click', () => {
+    if (!focusInterval) toggleFocusSession();
+    document.getElementById('focus-ring').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  document.getElementById('btn-sidebar-focus')?.addEventListener('click', () => {
+    setView('dashboard');
+    if (!focusInterval) toggleFocusSession();
+    document.getElementById('focus-ring').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  document.getElementById('btn-hero-ai')?.addEventListener('click', () => setView('ai'));
 
   document.getElementById('btn-dashboard-add-task')?.addEventListener('click', () => {
     setView('tasks');

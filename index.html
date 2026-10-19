@@ -3,49 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#17233f">
+  <meta name="theme-color" content="#080b18">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>Study Planner — Plan, Track, Succeed</title>
+  <title>Neural Study Space — Learn in your own orbit</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/study-planner.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <canvas id="learning-universe" aria-hidden="true"></canvas>
   <!-- ========== AUTH SCREENS ========== -->
   <div id="auth-screen" class="auth-screen">
     <div class="auth-layout">
-      <section class="auth-visual" aria-label="A three-dimensional study desk illustration">
-        <canvas id="study-scene" aria-hidden="true"></canvas>
-        <div class="scene-fallback" aria-hidden="true">
-          <div class="fallback-halo"></div>
-          <div class="fallback-book"><span></span><span></span></div>
-          <div class="fallback-clock"><i></i><b></b></div>
-          <div class="fallback-cube"></div>
-        </div>
+      <section class="auth-visual" aria-label="An interactive three-dimensional learning universe">
         <div class="visual-topline">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 32 32" fill="none"><path d="M5 7.5c4.4-.9 8.1 0 11 2.6v15c-2.9-2.6-6.6-3.5-11-2.6v-15Z"/><path d="M27 7.5c-4.4-.9-8.1 0-11 2.6v15c2.9-2.6 6.6-3.5 11-2.6v-15Z"/><path d="M16 10v15"/></svg>
           </span>
-          <span>STUDY PLANNER</span>
+          <span>NEURAL STUDY SPACE</span>
         </div>
         <div class="visual-copy">
-          <p class="visual-kicker">MAKE SPACE FOR YOUR BEST WORK</p>
-          <h2>A little more focus.<br>A lot more momentum.</h2>
-          <p>Turn your next deadline into a clear, doable plan.</p>
+          <p class="visual-kicker"><span class="scene-status-dot"></span> YOUR LEARNING UNIVERSE</p>
+          <h2>Ideas connect.<br>Your next chapter begins.</h2>
+          <p>A quieter way to focus, a clearer way to make progress.</p>
         </div>
-        <div class="visual-footnote"><span class="scene-status-dot"></span> YOUR STUDY SPACE, IN 3D</div>
+        <div class="visual-footnote"><span class="scene-status-dot"></span> A STUDY SPACE THAT MOVES WITH YOU</div>
       </section>
 
       <main class="auth-main">
         <div class="auth-card">
           <div class="auth-header">
-            <p class="auth-eyebrow">YOUR PERSONAL STUDY SPACE</p>
-            <h1 class="auth-logo">Study Planner</h1>
-            <p class="auth-tag">Plan your subjects. Track your tasks. Study smarter.</p>
+            <p class="auth-eyebrow">A SPACE FOR YOUR NEXT BIG IDEA</p>
+            <h1 class="auth-logo">Neural Study Space</h1>
+            <p class="auth-tag">Bring your subjects, plans, and focus into one connected learning space.</p>
           </div>
 
           <!-- Login Form -->
@@ -92,10 +86,16 @@
   <div id="app-screen" class="app-screen hidden">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1 class="sidebar-logo">Study Planner</h1>
-        <p class="sidebar-user" id="user-name">Student</p>
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M5 7.5c4.4-.9 8.1 0 11 2.6v15c-2.9-2.6-6.6-3.5-11-2.6v-15Zm22 0c-4.4-.9-8.1 0-11 2.6v15c2.9-2.6 6.6-3.5 11-2.6v-15ZM16 10v15"/></svg>
+          </span>
+          <div><h1 class="sidebar-logo">Neural Study Space</h1><p class="sidebar-caption">YOUR LEARNING UNIVERSE</p></div>
+        </div>
+        <p class="sidebar-user"><span class="profile-orbit" aria-hidden="true"></span><span id="user-name">Student</span></p>
       </div>
       <nav class="sidebar-nav">
+        <p class="nav-section-label">YOUR SPACE</p>
         <a href="#" class="nav-item active" data-view="dashboard">
           <span class="nav-icon icon-dashboard" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="4" rx="1.5"/><rect x="13.5" y="10.5" width="7" height="10" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span> Dashboard
         </a>
@@ -108,6 +108,12 @@
         <a href="#" class="nav-item" data-view="ai">
           <span class="nav-icon icon-ai" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2.8 1.9 6.1 6.1 1.9-6.1 1.9-1.9 6.1-1.9-6.1L4 10.8l6.1-1.9L12 2.8Z"/><path d="m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z"/></svg></span> AI Assistant
         </a>
+        <div class="sidebar-orbit-card">
+          <span class="orbit-card-kicker">STAY IN FLOW</span>
+          <strong>One idea at a time.</strong>
+          <span>Small steps build real momentum.</span>
+          <button type="button" class="orbit-pulse-button" id="btn-sidebar-focus">Start a focus sprint <span aria-hidden="true">↗</span></button>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <button type="button" class="btn btn-ghost btn-block" id="btn-logout">Sign out</button>
@@ -115,19 +121,66 @@
     </aside>
 
     <main class="main-content">
+      <header class="app-topbar">
+        <div class="topbar-brand">
+          <span class="topbar-live-dot" aria-hidden="true"></span>
+          <span>YOUR STUDY SPACE</span>
+        </div>
+        <div class="topbar-tools">
+          <div class="global-search">
+            <label class="sr-only" for="global-search-input">Search your planner</label>
+            <span class="search-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg>
+            </span>
+            <input id="global-search-input" type="search" placeholder="Search tasks, subjects..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="global-search-results">
+            <kbd class="search-shortcut" aria-hidden="true">Ctrl K</kbd>
+            <div id="global-search-results" class="search-results hidden" role="listbox" aria-label="Planner search results"></div>
+          </div>
+          <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Switch to light theme">
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.2A8.6 8.6 0 0 1 8.8 3.5 8.7 8.7 0 1 0 20.5 15.2Z"/></svg>
+            <span id="theme-toggle-label">Light mode</span>
+          </button>
+          <button type="button" class="btn btn-primary topbar-add" id="btn-topbar-add-task"><span aria-hidden="true">+</span> New task</button>
+        </div>
+      </header>
       <!-- Dashboard View -->
       <div id="view-dashboard" class="view active">
         <header class="view-header dashboard-welcome">
           <div>
-            <p class="welcome-kicker">YOUR STUDY SPACE</p>
+            <p class="welcome-kicker"><span class="scene-status-dot"></span> YOUR UNIVERSE IS READY</p>
             <h2 id="dashboard-greeting">Welcome back</h2>
             <p id="dashboard-date" class="view-desc">Your study overview</p>
           </div>
           <div class="dashboard-actions">
             <button type="button" class="btn btn-ghost" id="btn-dashboard-add-subject">+ Subject</button>
-            <button type="button" class="btn btn-primary" id="btn-dashboard-add-task">+ Add task</button>
           </div>
         </header>
+        <section class="learning-hero" aria-labelledby="learning-hero-title">
+          <div class="learning-hero-copy">
+            <p class="hero-overline"><span class="hero-signal"></span> NEURAL STUDY SPACE <span class="hero-overline-divider">/</span> PERSONAL LEARNING FIELD</p>
+            <h3 id="learning-hero-title">Your ideas are<br><span>in motion.</span></h3>
+            <p class="learning-hero-description">Every subject opens a new orbit. Choose one small thing to move forward today.</p>
+            <div class="learning-hero-actions">
+              <button type="button" class="btn btn-primary hero-focus-button" id="btn-hero-focus">Begin a focus sprint <span aria-hidden="true">↗</span></button>
+              <button type="button" class="hero-ai-link" id="btn-hero-ai">Ask your study guide <span aria-hidden="true">→</span></button>
+            </div>
+            <div class="hero-presence"><span class="hero-presence-dot"></span><span id="hero-presence-copy">Your learning space is taking shape</span></div>
+          </div>
+          <div class="learning-hero-orbit" aria-hidden="true">
+            <div class="hero-orbit-ring hero-orbit-ring-outer"></div>
+            <div class="hero-orbit-ring hero-orbit-ring-inner"></div>
+            <div class="hero-orbit-core"><span class="hero-core-glyph">✳</span><span class="hero-core-label">YOU</span></div>
+            <span class="hero-node hero-node-one"><i></i><b>FOCUS</b></span>
+            <span class="hero-node hero-node-two"><i></i><b>IDEAS</b></span>
+            <span class="hero-node hero-node-three"><i></i><b>GROWTH</b></span>
+            <svg class="hero-constellation" viewBox="0 0 400 280" fill="none"><path d="M75 157 169 53l146 63-73 111-167-70Zm94-104 73 174m73-111L75 157" stroke="url(#hero-line-gradient)" stroke-width="1"/><defs><linearGradient id="hero-line-gradient" x1="75" y1="53" x2="315" y2="227" gradientUnits="userSpaceOnUse"><stop stop-color="#69E7F2" stop-opacity=".7"/><stop offset=".55" stop-color="#A990FF" stop-opacity=".65"/><stop offset="1" stop-color="#EC75D1" stop-opacity=".38"/></linearGradient></defs></svg>
+            <span class="hero-orbit-tag hero-tag-left">KNOWLEDGE<br>NETWORK <span>●</span></span>
+            <span class="hero-orbit-tag hero-tag-right">SESSION<br>ACTIVE <span>✳</span></span>
+          </div>
+          <div class="learning-hero-bottom"><span>FIELD NOTE 01</span><span>THE NEXT STEP IS ENOUGH</span><span>SCROLL TO EXPLORE ↓</span></div>
+        </section>
+        <div class="dashboard-section-label"><span>YOUR LEARNING SIGNALS</span><span class="dashboard-section-line"></span><span>LIVE OVERVIEW</span></div>
         <div class="dashboard-grid">
           <div class="stat-card stat-subjects">
             <span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 8c5-1.3 9-.3 12 2.3v15c-3-2.6-7-3.6-12-2.3V8Z"/><path d="M28 8c-5-1.3-9-.3-12 2.3v15c3-2.6 7-3.6 12-2.3V8Z"/><path d="M16 10v15"/></svg></span>

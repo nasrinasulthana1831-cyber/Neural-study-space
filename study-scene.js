@@ -1,176 +1,406 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 (() => {
-  const canvas = document.getElementById('study-scene');
-  const visual = document.querySelector('.auth-visual');
-  if (!canvas || !visual) return;
+  const canvas = document.getElementById('learning-universe');
+  if (!canvas) return;
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let renderer;
 
   try {
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: window.devicePixelRatio <= 1.5,
+      powerPreference: 'low-power'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 40);
-    camera.position.set(0, 2.2, 14.2);
-    camera.lookAt(0, 0.5, 0);
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
+    camera.position.set(0, 0, 12);
 
-    scene.add(new THREE.HemisphereLight(0xf5f1ff, 0x1a2440, 2.05));
-    const keyLight = new THREE.DirectionalLight(0xffe7c4, 3.2);
-    keyLight.position.set(-3, 7, 6);
-    keyLight.castShadow = true;
-    scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0x9887f3, 20, 12);
-    rimLight.position.set(4, 3, -2);
-    scene.add(rimLight);
+    const ambient = new THREE.AmbientLight(0x9aa9ff, 0.9);
+    scene.add(ambient);
+    const violetLight = new THREE.PointLight(0x9274ff, 16, 16);
+    violetLight.position.set(3, 2.5, 4);
+    scene.add(violetLight);
+    const cyanLight = new THREE.PointLight(0x38dbe4, 12, 13);
+    cyanLight.position.set(-3, -2, 3);
+    scene.add(cyanLight);
 
-    const objects = new THREE.Group();
-    scene.add(objects);
+    const field = new THREE.Group();
+    field.position.set(2.55, 0.05, 0);
+    scene.add(field);
 
-    const material = (color, roughness = 0.48, metalness = 0.02) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
-    const navy = material(0x273858);
-    const purple = material(0x7769ce, 0.32);
-    const paper = material(0xf4ebdc, 0.8);
-    const ink = material(0x66728a, 0.72);
-    const brass = material(0xd9a55f, 0.3, 0.55);
-    const coral = material(0xd98168, 0.36);
-    const mint = material(0x76b8a4, 0.32);
+    const neuralCore = new THREE.Group();
+    field.add(neuralCore);
+    const hemispheres = [];
+    const networkMaterials = [];
+    const nodeInstances = [];
 
-    const addBox = (width, height, depth, mat, position, group = objects, rotation = null) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
-      mesh.position.set(...position);
-      if (rotation) mesh.rotation.set(...rotation);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      group.add(mesh);
-      return mesh;
-    };
+    function makeHemisphere(side, color) {
+      const lobe = new THREE.Group();
+      lobe.position.x = side * 0.36;
+      lobe.rotation.z = side * -0.055;
+      neuralCore.add(lobe);
 
-    const desk = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.18, 64), material(0x202e49, 0.82));
-    desk.position.y = -0.42;
-    desk.scale.set(1.16, 1, 0.72);
-    desk.receiveShadow = true;
-    objects.add(desk);
-
-    const book = new THREE.Group();
-    book.position.set(-0.25, -0.25, 0.2);
-    book.scale.setScalar(0.84);
-    book.rotation.y = -0.12;
-    objects.add(book);
-    addBox(4.7, 0.28, 2.85, purple, [0, 0, 0], book);
-    addBox(4.42, 0.16, 2.62, paper, [0, 0.19, 0], book);
-    addBox(2.12, 0.075, 2.58, paper, [-1.08, 0.31, 0], book);
-    addBox(2.12, 0.075, 2.58, paper, [1.08, 0.31, 0], book);
-    addBox(0.1, 0.16, 2.72, navy, [0, 0.2, 0], book);
-
-    for (let line = 0; line < 5; line += 1) {
-      const z = -0.8 + line * 0.32;
-      addBox(1.25, 0.012, 0.018, ink, [-1.02, 0.354, z], book);
-      addBox(1.25, 0.012, 0.018, ink, [1.02, 0.354, z], book);
-    }
-    addBox(0.62, 0.025, 0.09, coral, [-1.45, 0.36, -0.86], book);
-    addBox(0.72, 0.025, 0.09, purple, [1.38, 0.36, -0.86], book);
-
-    const clock = new THREE.Group();
-    clock.position.set(2.1, 1.38, -0.45);
-    clock.scale.setScalar(0.84);
-    clock.rotation.x = Math.PI / 2;
-    objects.add(clock);
-    const clockRim = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.76, 0.18, 48), brass);
-    clockRim.castShadow = true;
-    clock.add(clockRim);
-    const clockFace = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.2, 48), paper);
-    clockFace.position.y = 0.13;
-    clock.add(clockFace);
-    addBox(0.045, 0.035, 0.44, navy, [0, 0.26, 0], clock, [0, 0, -0.28]);
-    addBox(0.045, 0.035, 0.3, coral, [0.11, 0.26, 0.03], clock, [0, 0.83, 0]);
-    const hub = new THREE.Mesh(new THREE.SphereGeometry(0.07, 20, 16), brass);
-    hub.position.set(0, 0.27, 0);
-    clock.add(hub);
-
-    const pencil = new THREE.Group();
-    pencil.position.set(-1.9, 0.65, 1.1);
-    pencil.scale.setScalar(0.82);
-    pencil.rotation.z = -0.85;
-    pencil.rotation.x = 0.12;
-    objects.add(pencil);
-    const pencilBody = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.45, 10), coral);
-    pencilBody.castShadow = true;
-    pencil.add(pencilBody);
-    const pencilTip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.25, 10), paper);
-    pencilTip.position.y = -1.34;
-    pencilTip.castShadow = true;
-    pencil.add(pencilTip);
-    const pencilLead = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.1, 8), navy);
-    pencilLead.position.y = -1.51;
-    pencil.add(pencilLead);
-    const pencilEnd = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.092, 0.19, 10), brass);
-    pencilEnd.position.y = 1.23;
-    pencil.add(pencilEnd);
-
-    const focusToken = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 1), mint);
-    focusToken.position.set(-1.85, 1.95, -0.8);
-    focusToken.rotation.set(0.28, 0.42, 0.22);
-    focusToken.castShadow = true;
-    objects.add(focusToken);
-
-    const taskCard = new THREE.Group();
-    taskCard.position.set(1.75, 0.2, 1.2);
-    taskCard.scale.setScalar(0.88);
-    taskCard.rotation.set(-0.08, -0.14, -0.13);
-    objects.add(taskCard);
-    addBox(0.82, 0.13, 0.78, navy, [0, 0, 0], taskCard);
-    addBox(0.62, 0.018, 0.58, paper, [0, 0.075, 0], taskCard);
-    addBox(0.3, 0.025, 0.09, mint, [-0.1, 0.1, -0.04], taskCard);
-
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let targetX = 0;
-    let targetY = 0;
-    let frame = 0;
-
-    const resize = () => {
-      const bounds = visual.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) return;
-      renderer.setSize(bounds.width, bounds.height, false);
-      camera.aspect = bounds.width / bounds.height;
-      camera.position.z = bounds.width < 680 ? 12.5 : bounds.width < 980 ? 15.5 : 14.2;
-      objects.position.y = bounds.width < 680 ? 1.4 : 0;
-      camera.updateProjectionMatrix();
-    };
-
-    const animate = () => {
-      frame = window.requestAnimationFrame(animate);
-      if (visual.classList.contains('hidden') || visual.closest('.hidden')) return;
-      if (!reducedMotion) {
-        objects.rotation.y += 0.0015;
-        focusToken.rotation.y += 0.004;
-        focusToken.rotation.x += 0.0015;
-        objects.rotation.x += (targetX - objects.rotation.x) * 0.025;
-        objects.rotation.z += (targetY - objects.rotation.z) * 0.025;
+      const shellGeometry = new THREE.SphereGeometry(0.84, 40, 32);
+      const positions = shellGeometry.attributes.position;
+      for (let index = 0; index < positions.count; index += 1) {
+        const x = positions.getX(index);
+        const y = positions.getY(index);
+        const z = positions.getZ(index);
+        const ripple = 1 + Math.sin(y * 17 + z * 9) * 0.018 + Math.sin(x * 11 - y * 7) * 0.012;
+        positions.setXYZ(index, x * ripple, y * ripple * 1.13, z * ripple * 0.79);
       }
-      renderer.render(scene, camera);
-    };
+      shellGeometry.computeVertexNormals();
 
-    visual.addEventListener('pointermove', event => {
-      if (reducedMotion) return;
-      const bounds = visual.getBoundingClientRect();
-      targetX = ((event.clientY - bounds.top) / bounds.height - 0.5) * 0.055;
-      targetY = ((event.clientX - bounds.left) / bounds.width - 0.5) * 0.055;
+      const shell = new THREE.Mesh(
+        shellGeometry,
+        new THREE.MeshBasicMaterial({
+          color,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.12,
+          depthWrite: false
+        })
+      );
+      lobe.add(shell);
+      const inner = new THREE.Mesh(
+        new THREE.SphereGeometry(0.82, 28, 20),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.028, side: THREE.BackSide })
+      );
+      inner.scale.set(1, 1.12, 0.78);
+      lobe.add(inner);
+
+      const random = (() => {
+        let seed = side > 0 ? 4781 : 8263;
+        return () => {
+          seed = (seed * 16807) % 2147483647;
+          return (seed - 1) / 2147483646;
+        };
+      })();
+      const nodeCount = 76;
+      const nodePositions = [];
+      for (let index = 0; index < nodeCount; index += 1) {
+        const y = random() * 1.85 - 0.925;
+        const angle = random() * Math.PI * 2;
+        const radius = Math.sqrt(Math.max(0, 1 - y * y));
+        const wave = Math.sin(y * 13 + Math.cos(angle * 3)) * 0.035;
+        nodePositions.push(new THREE.Vector3(
+          (Math.cos(angle) * radius + wave) * 0.82,
+          y * 0.93,
+          Math.sin(angle) * radius * 0.63
+        ));
+      }
+
+      const edges = [];
+      nodePositions.forEach((point, pointIndex) => {
+        const nearest = nodePositions
+          .map((other, otherIndex) => ({ other, otherIndex, distance: point.distanceTo(other) }))
+          .filter(item => item.otherIndex !== pointIndex)
+          .sort((first, second) => first.distance - second.distance)
+          .slice(0, 3);
+        nearest.forEach(item => {
+          if (item.otherIndex > pointIndex && item.distance < 0.57) {
+            edges.push(point.x, point.y, point.z, item.other.x, item.other.y, item.other.z);
+          }
+        });
+      });
+      const edgeGeometry = new THREE.BufferGeometry();
+      edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edges, 3));
+      const edgeMaterial = new THREE.LineBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      networkMaterials.push(edgeMaterial);
+      lobe.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
+
+      const nodeMesh = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(0.022, 8, 6),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.72,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        }),
+        nodeCount
+      );
+      const dummy = new THREE.Object3D();
+      nodePositions.forEach((point, index) => {
+        dummy.position.copy(point);
+        dummy.scale.setScalar(index % 7 === 0 ? 1.5 : 1);
+        dummy.updateMatrix();
+        nodeMesh.setMatrixAt(index, dummy.matrix);
+      });
+      nodeMesh.instanceMatrix.needsUpdate = true;
+      nodeMesh.userData.baseColor = color;
+      nodeInstances.push(nodeMesh);
+      lobe.add(nodeMesh);
+
+      hemispheres.push(lobe);
+    }
+
+    makeHemisphere(-1, 0x51dce1);
+    makeHemisphere(1, 0xa48aff);
+
+    const seam = new THREE.Mesh(
+      new THREE.TorusGeometry(0.055, 0.012, 8, 40),
+      new THREE.MeshBasicMaterial({
+        color: 0xf2a5ff,
+        transparent: true,
+        opacity: 0.62,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    seam.position.set(0, 0, 0.66);
+    neuralCore.add(seam);
+
+    const orbitMaterials = [];
+    const orbits = [
+      { radius: 1.25, tube: 0.006, color: 0x5adce8, rotation: [0.94, 0.18, 0.22], opacity: 0.48 },
+      { radius: 1.53, tube: 0.004, color: 0x9b7bff, rotation: [0.22, 1.13, -0.24], opacity: 0.32 },
+      { radius: 1.83, tube: 0.004, color: 0xf080d5, rotation: [1.17, 0.36, 0.6], opacity: 0.22 }
+    ];
+    orbits.forEach((config, index) => {
+      const material = new THREE.MeshBasicMaterial({
+        color: config.color,
+        transparent: true,
+        opacity: config.opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(config.radius, config.tube, 8, 180),
+        material
+      );
+      ring.rotation.set(...config.rotation);
+      ring.userData.orbitIndex = index;
+      field.add(ring);
+      orbitMaterials.push(material);
     });
-    visual.addEventListener('pointerleave', () => { targetX = 0; targetY = 0; });
-    window.addEventListener('resize', resize);
-    if ('ResizeObserver' in window) new ResizeObserver(resize).observe(visual);
-    resize();
-    visual.classList.add('scene-ready');
-    animate();
 
+    function makeGlyph(label, color) {
+      const textureCanvas = document.createElement('canvas');
+      textureCanvas.width = 256;
+      textureCanvas.height = 128;
+      const context = textureCanvas.getContext('2d');
+      context.clearRect(0, 0, 256, 128);
+      context.font = '600 66px "Outfit", sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.shadowColor = color;
+      context.shadowBlur = 24;
+      context.fillStyle = color;
+      context.fillText(label, 128, 64);
+      const texture = new THREE.CanvasTexture(textureCanvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      }));
+      sprite.scale.set(0.7, 0.35, 1);
+      return sprite;
+    }
+
+    const glyphs = [
+      { text: '∑', color: '#82e8f1', position: [-1.7, 1.14, 0.25] },
+      { text: 'π', color: '#c7a4ff', position: [1.7, -0.78, 0.35] },
+      { text: 'f(x)', color: '#f19bdd', position: [0.15, 1.85, -0.35] },
+      { text: '∞', color: '#79dbc1', position: [-1.55, -1.25, -0.15] }
+    ];
+    glyphs.forEach((glyph, index) => {
+      const sprite = makeGlyph(glyph.text, glyph.color);
+      sprite.position.set(...glyph.position);
+      sprite.userData.floatOffset = index * 1.7;
+      sprite.userData.baseY = glyph.position[1];
+      field.add(sprite);
+    });
+
+    const studyObject = new THREE.Group();
+    studyObject.position.set(1.6, 0.32, 0.4);
+    studyObject.rotation.set(0.28, -0.54, 0.16);
+    field.add(studyObject);
+    const bookBase = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.1, 0.43),
+      new THREE.MeshBasicMaterial({ color: 0x705ac8, transparent: true, opacity: 0.68 })
+    );
+    studyObject.add(bookBase);
+    [-0.145, 0.145].forEach(side => {
+      const page = new THREE.Mesh(
+        new THREE.BoxGeometry(0.27, 0.035, 0.39),
+        new THREE.MeshBasicMaterial({ color: side < 0 ? 0x81dee7 : 0xc3b1ff, transparent: true, opacity: 0.75 })
+      );
+      page.position.set(side, 0.068, -0.005);
+      studyObject.add(page);
+    });
+    const bookSpine = new THREE.Mesh(
+      new THREE.BoxGeometry(0.024, 0.045, 0.4),
+      new THREE.MeshBasicMaterial({ color: 0xf1a5e6, transparent: true, opacity: 0.82 })
+    );
+    bookSpine.position.set(0, 0.078, 0);
+    studyObject.add(bookSpine);
+
+    const particleCount = window.innerWidth < 700 ? 240 : 430;
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleDrifts = new Float32Array(particleCount);
+    for (let index = 0; index < particleCount; index += 1) {
+      particlePositions[index * 3] = (Math.random() - 0.5) * 19;
+      particlePositions[index * 3 + 1] = (Math.random() - 0.5) * 12;
+      particlePositions[index * 3 + 2] = -1 - Math.random() * 12;
+      particleDrifts[index] = 0.05 + Math.random() * 0.12;
+    }
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    const particleMaterial = new THREE.PointsMaterial({
+      color: 0x93c9f4,
+      size: 0.018,
+      transparent: true,
+      opacity: 0.4,
+      sizeAttenuation: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(particles);
+
+    const pulseRings = [];
+    for (let index = 0; index < 3; index += 1) {
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: index === 1 ? 0x53e0e6 : 0x9b7bff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      const pulseRing = new THREE.Mesh(
+        new THREE.TorusGeometry(1.28 + index * 0.12, 0.009, 6, 128),
+        ringMaterial
+      );
+      pulseRing.rotation.set(0.4 + index * 0.27, index * 0.63, 0.5);
+      pulseRing.userData.delay = index * 0.24;
+      field.add(pulseRing);
+      pulseRings.push(pulseRing);
+    }
+
+    let pulseStart = -10;
+    let pointerX = 0;
+    let pointerY = 0;
+    let frame = 0;
+    const clock = new THREE.Clock();
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const appIsActive = !document.getElementById('app-screen')?.classList.contains('hidden');
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.position.z = width < 700 ? 14 : 12;
+      camera.updateProjectionMatrix();
+      field.position.x = appIsActive
+        ? (width < 700 ? 1.3 : width < 1100 ? 2 : 2.55)
+        : (width < 700 ? 0.55 : -2.45);
+      field.scale.setScalar(width < 700 ? 0.82 : 1);
+      if (reducedMotion) renderer.render(scene, camera);
+    }
+
+    function pulse() {
+      if (reducedMotion) return;
+      pulseStart = clock.elapsedTime;
+    }
+
+    function animate() {
+      if (document.hidden) {
+        frame = 0;
+        return;
+      }
+      if (reducedMotion) return;
+      frame = window.requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.04);
+      const elapsed = clock.elapsedTime;
+      neuralCore.rotation.y += 0.0018;
+      neuralCore.rotation.x += (pointerY * 0.11 - neuralCore.rotation.x) * 0.012;
+      neuralCore.rotation.z += (pointerX * 0.12 - neuralCore.rotation.z) * 0.012;
+      hemispheres[0].rotation.y = -0.06 + Math.sin(elapsed * 0.26) * 0.018;
+      hemispheres[1].rotation.y = 0.06 + Math.sin(elapsed * 0.26 + 0.3) * 0.018;
+      studyObject.position.y = 0.32 + Math.sin(elapsed * 0.45) * 0.07;
+      studyObject.rotation.y += 0.0012;
+      field.rotation.y += (pointerX * 0.028 - field.rotation.y) * 0.008;
+      field.rotation.x += (-pointerY * 0.02 - field.rotation.x) * 0.008;
+      field.children.forEach(child => {
+        if (child.isSprite) {
+          child.position.y = child.userData.baseY + Math.sin(elapsed * 0.45 + child.userData.floatOffset) * 0.08;
+        } else if (child.userData.orbitIndex !== undefined) {
+          child.rotation.z += 0.00028 * (child.userData.orbitIndex + 1);
+        }
+      });
+      const positions = particleGeometry.attributes.position.array;
+      for (let index = 0; index < particleCount; index += 1) {
+        const yOffset = index * 3 + 1;
+        positions[yOffset] += particleDrifts[index] * delta;
+        if (positions[yOffset] > 6) positions[yOffset] = -6;
+      }
+      particleGeometry.attributes.position.needsUpdate = true;
+
+      const pulseProgress = elapsed - pulseStart;
+      pulseRings.forEach(ring => {
+        const progress = (pulseProgress - ring.userData.delay) / 1.7;
+        if (progress >= 0 && progress <= 1) {
+          ring.scale.setScalar(0.58 + progress * 0.8);
+          ring.material.opacity = Math.sin(progress * Math.PI) * 0.42;
+        } else {
+          ring.material.opacity = 0;
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('pointermove', event => {
+      pointerX = (event.clientX / window.innerWidth - 0.5) * 2;
+      pointerY = (event.clientY / window.innerHeight - 0.5) * 2;
+    }, { passive: true });
+    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('study-space-pulse', pulse);
+    const appObserver = new MutationObserver(resize);
+    appObserver.observe(document.getElementById('app-screen'), { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (reducedMotion) renderer.render(scene, camera);
+      else if (!frame) animate();
+    });
     window.addEventListener('pagehide', () => {
       window.cancelAnimationFrame(frame);
+      window.removeEventListener('study-space-pulse', pulse);
+      appObserver.disconnect();
       renderer.dispose();
+      scene.traverse(object => {
+        object.geometry?.dispose();
+        if (Array.isArray(object.material)) object.material.forEach(material => material.dispose());
+        else object.material?.dispose();
+      });
     }, { once: true });
+
+    resize();
+    if (reducedMotion) renderer.render(scene, camera);
+    else animate();
+    document.documentElement.classList.add('learning-universe-ready');
   } catch (error) {
-    console.warn('The study scene could not be initialized.', error);
+    console.warn('The learning universe could not be initialized.', error);
+    renderer?.dispose();
+    document.documentElement.classList.add('learning-universe-fallback');
   }
 })();
