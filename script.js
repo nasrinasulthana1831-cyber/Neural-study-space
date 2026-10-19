@@ -3,8 +3,12 @@ const STORAGE = {
   users: 'studyPlanner_users',
   subjects: 'studyPlanner_subjects',
   tasks: 'studyPlanner_tasks',
+  sessions: 'studyPlanner_sessions',
   current: 'studyPlanner_currentUser'
 };
+
+// Set this to your server endpoint; never put a model API key in this file.
+const AI_API_ENDPOINT = '';
 
 const SUBJECT_COLORS = [
   '#2d5a4a', '#c45c3e', '#5a4a8c', '#2a7a6e', '#8b5a3c',
@@ -12,6 +16,12 @@ const SUBJECT_COLORS = [
 ];
 
 let currentUser = null;
+let aiConversation = [];
+const focusDuration = 25 * 60;
+let focusRemaining = focusDuration;
+let focusInterval = null;
+let focusEndsAt = null;
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 function id() {
   return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
@@ -31,10 +41,12 @@ function setJson(key, val) {
 function getUsers() { return getJson(STORAGE.users, []); }
 function getSubjects() { return getJson(STORAGE.subjects, {}); }
 function getTasks() { return getJson(STORAGE.tasks, {}); }
+function getSessions() { return getJson(STORAGE.sessions, {}); }
 
 function saveUsers(v) { setJson(STORAGE.users, v); }
 function saveSubjects(v) { setJson(STORAGE.subjects, v); }
 function saveTasks(v) { setJson(STORAGE.tasks, v); }
+function saveSessions(v) { setJson(STORAGE.sessions, v); }
 
 function userSubjects() {
   if (!currentUser) return [];
@@ -48,6 +60,12 @@ function userTasks() {
   return all[currentUser.id] || [];
 }
 
+function userSessions() {
+  if (!currentUser) return [];
+  const all = getSessions();
+  return all[currentUser.id] || [];
+}
+
 function setUserSubs(arr) {
   const all = getSubjects();
   all[currentUser.id] = arr;
@@ -58,6 +76,12 @@ function setUserTasks(arr) {
   const all = getTasks();
   all[currentUser.id] = arr;
   saveTasks(all);
+}
+
+function setUserSessions(arr) {
+  const all = getSessions();
+  all[currentUser.id] = arr;
+  saveSessions(all);
 }
 
 /* ========== Auth ========== */
@@ -85,6 +109,10 @@ function loadSession() {
 }
 
 function logout() {
+  window.clearInterval(focusInterval);
+  focusInterval = null;
+  focusEndsAt = null;
+  focusRemaining = focusDuration;
   currentUser = null;
   localStorage.removeItem(STORAGE.current);
   showAuth();
@@ -223,6 +251,158 @@ function getAITips() {
   return tips;
 }
 
+function getAIPlannerContext() {
+  const pendingTasks = userTasks()
+    .filter(task => !task.completed)
+    .sort((a, b) => {
+      if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
+      return a.deadline ? -1 : b.deadline ? 1 : 0;
+    });
+
+  return {
+    subjects: userSubjects().map(subject => subject.name),
+    pendingTasks: pendingTasks.slice(0, 8).map(task => ({
+      title: task.title,
+      subject: getSubject(task.subjectId)?.name || 'Unassigned',
+      deadline: task.deadline
+    }))
+  };
+}
+
+function getDemoAIResponse(message) {
+  const prompt = message.toLowerCase();
+  const tasks = getAIPlannerContext().pendingTasks;
+  const nextTask = tasks[0];
+
+  if (!nextTask) {
+    return 'Your planner has no pending tasks right now. Add a task with a deadline and I can help you shape a focused study plan.';
+  }
+
+  const taskLabel = `“${nextTask.title}” for ${nextTask.subject}`;
+  const deadline = nextTask.deadline ? `, due ${formatDeadline(nextTask.deadline)}` : '';
+
+  if (prompt.includes('break') || prompt.includes('smaller') || prompt.includes('steps')) {
+    return `For ${taskLabel}, try this: 1) gather the materials, 2) work through one small section for 25 minutes, 3) take a 5-minute break, then 4) check your work and note what remains. Adjust the steps to fit the assignment.`;
+  }
+  if (prompt.includes('first') || prompt.includes('focus') || prompt.includes('priority')) {
+    return `Start with ${taskLabel}${deadline}. Set a 25-minute timer, define one small outcome, and take a short break before deciding what comes next.`;
+  }
+  if (prompt.includes('plan') || prompt.includes('today') || prompt.includes('session')) {
+    return `A simple session: begin with ${taskLabel}${deadline}, study for 25 minutes, then take a 5-minute break. If you have time, review the next task on your list. Keep the goal small enough to finish in one sitting.`;
+  }
+  return `You have ${tasks.length} pending task${tasks.length === 1 ? '' : 's'} in your planner. Your nearest listed priority is ${taskLabel}${deadline}. Ask me to plan your session, choose a task, or break an assignment into steps.`;
+}
+
+function appendChatMessage(role, text) {
+  const log = document.getElementById('ai-chat-log');
+  const message = document.createElement('div');
+  message.className = `chat-message ${role}`;
+  const label = document.createElement('span');
+  label.className = 'message-label';
+  label.textContent = role === 'user' ? 'You' : 'Study assistant';
+  const content = document.createElement('p');
+  content.textContent = text;
+  message.append(label, content);
+  log.appendChild(message);
+  log.scrollTop = log.scrollHeight;
+  return message;
+}
+
+function appendTypingIndicator() {
+  const message = document.createElement('div');
+  message.className = 'chat-message assistant typing-indicator';
+  message.setAttribute('role', 'status');
+  message.setAttribute('aria-label', 'Study assistant is responding');
+  const label = document.createElement('span');
+  label.className = 'message-label';
+  label.textContent = 'Study assistant';
+  const dots = document.createElement('span');
+  dots.className = 'typing-dots';
+  for (let index = 0; index < 3; index += 1) dots.appendChild(document.createElement('span'));
+  message.append(label, dots);
+  const log = document.getElementById('ai-chat-log');
+  log.appendChild(message);
+  log.scrollTop = log.scrollHeight;
+  return message;
+}
+
+async function sendAIMessage(value) {
+  const input = document.getElementById('ai-chat-input');
+  const submit = document.querySelector('#ai-chat-form button[type="submit"]');
+  const status = document.getElementById('ai-chat-status');
+  const message = value.trim();
+  if (!message) {
+    status.textContent = 'Write a message before sending.';
+    input.focus();
+    return;
+  }
+
+  status.textContent = '';
+  input.value = '';
+  input.disabled = true;
+  submit.disabled = true;
+  appendChatMessage('user', message);
+  const typing = appendTypingIndicator();
+
+  try {
+    let reply;
+    if (AI_API_ENDPOINT) {
+      const response = await fetch(AI_API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          history: aiConversation.slice(-8),
+          context: getAIPlannerContext()
+        })
+      });
+      if (!response.ok) throw new Error(`Assistant service returned ${response.status}.`);
+      const result = await response.json();
+      if (typeof result.reply !== 'string' || !result.reply.trim()) {
+        throw new Error('Assistant service returned an invalid response.');
+      }
+      reply = result.reply.trim();
+    } else {
+      await new Promise(resolve => window.setTimeout(resolve, 500));
+      reply = getDemoAIResponse(message);
+    }
+
+    typing.remove();
+    appendChatMessage('assistant', reply);
+    aiConversation.push({ role: 'user', content: message }, { role: 'assistant', content: reply });
+  } catch (error) {
+    typing.remove();
+    status.textContent = error.message || 'The assistant could not respond. Please try again.';
+  } finally {
+    input.disabled = false;
+    submit.disabled = false;
+    input.focus();
+  }
+}
+
+function initializeAIChat() {
+  const badge = document.getElementById('ai-mode-badge');
+  const note = document.getElementById('ai-mode-note');
+  if (AI_API_ENDPOINT) {
+    badge.textContent = 'Backend configured';
+    note.textContent = 'Messages and selected planner details are sent to your configured backend. No API keys are stored in this app.';
+  }
+
+  document.getElementById('ai-chat-form')?.addEventListener('submit', event => {
+    event.preventDefault();
+    sendAIMessage(document.getElementById('ai-chat-input').value);
+  });
+  document.getElementById('ai-chat-input')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      event.currentTarget.form.requestSubmit();
+    }
+  });
+  document.querySelectorAll('.prompt-chip').forEach(button => {
+    button.addEventListener('click', () => sendAIMessage(button.dataset.prompt || ''));
+  });
+}
+
 function escapeHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
@@ -259,14 +439,21 @@ function renderDashboard() {
   const now = new Date();
   const in3d = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
   const dueSoon = tasks.filter(t => !t.completed && t.deadline && new Date(t.deadline) <= in3d).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  const sessionStats = getFocusStats();
 
+  document.getElementById('dashboard-greeting').textContent = `Welcome back, ${(currentUser?.name || 'Student').split(' ')[0]}`;
+  document.getElementById('dashboard-date').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  document.getElementById('today-plan-date').textContent = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
   document.getElementById('stat-subjects').textContent = subjects.length;
   document.getElementById('stat-tasks').textContent = tasks.length;
   document.getElementById('stat-completed').textContent = completed;
   document.getElementById('stat-due').textContent = dueSoon.length;
+  document.getElementById('stat-focus-minutes').textContent = sessionStats.minutes;
+  document.getElementById('stat-streak').textContent = sessionStats.streak;
 
   const list = document.getElementById('dashboard-due-list');
   const empty = document.getElementById('dashboard-due-empty');
+  document.getElementById('dashboard-deadline-count').textContent = dueSoon.length;
   list.innerHTML = '';
   if (dueSoon.length === 0) {
     list.classList.add('hidden');
@@ -286,6 +473,179 @@ function renderDashboard() {
       list.appendChild(el);
     });
   }
+
+  renderTodayPlan(tasks);
+  renderSubjectProgress(subjects, tasks);
+  renderCalendar(tasks);
+}
+
+function getLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getFocusStats() {
+  const sessions = userSessions();
+  const todayKey = getLocalDateKey(new Date());
+  const todaySessions = sessions.filter(session => session.date === todayKey);
+  const activeDays = new Set(sessions.map(session => session.date));
+  const cursor = new Date();
+  if (!activeDays.has(todayKey)) cursor.setDate(cursor.getDate() - 1);
+
+  let streak = 0;
+  while (activeDays.has(getLocalDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return {
+    minutes: todaySessions.reduce((sum, session) => sum + (Number(session.minutes) || 0), 0),
+    streak
+  };
+}
+
+function renderTodayPlan(tasks) {
+  const list = document.getElementById('today-plan-list');
+  const empty = document.getElementById('today-plan-empty');
+  const pending = tasks.filter(task => !task.completed).sort((a, b) => {
+    if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
+    return a.deadline ? -1 : b.deadline ? 1 : 0;
+  }).slice(0, 3);
+
+  list.innerHTML = '';
+  list.classList.toggle('hidden', pending.length === 0);
+  empty.classList.toggle('hidden', pending.length > 0);
+
+  pending.forEach((task, index) => {
+    const subject = getSubject(task.subjectId);
+    const item = document.createElement('article');
+    item.className = 'today-plan-item';
+    const deadline = task.deadline ? formatDeadline(task.deadline) : 'No deadline';
+    item.innerHTML = `
+      <span class="plan-order">${String(index + 1).padStart(2, '0')}</span>
+      <span class="plan-color" style="--subject-color:${subject?.color || '#8476d8'}"></span>
+      <div class="plan-task-copy">
+        <h4>${escapeHtml(task.title)}</h4>
+        <p>${escapeHtml(subject?.name || 'Unassigned')} <span>·</span> ${escapeHtml(deadline)}</p>
+      </div>
+      <span class="plan-duration">25 min focus</span>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function renderSubjectProgress(subjects, tasks) {
+  const list = document.getElementById('dashboard-subject-progress');
+  const empty = document.getElementById('dashboard-progress-empty');
+  list.innerHTML = '';
+  list.classList.toggle('hidden', subjects.length === 0);
+  empty.classList.toggle('hidden', subjects.length > 0);
+
+  subjects.slice(0, 5).forEach(subject => {
+    const subjectTasks = tasks.filter(task => task.subjectId === subject.id);
+    const completed = subjectTasks.filter(task => task.completed).length;
+    const percent = subjectTasks.length ? Math.round(completed / subjectTasks.length * 100) : 0;
+    const item = document.createElement('div');
+    item.className = 'subject-progress-item';
+    item.innerHTML = `
+      <div class="subject-progress-heading">
+        <span class="subject-progress-name"><span class="subject-progress-dot" style="--subject-color:${subject.color}"></span>${escapeHtml(subject.name)}</span>
+        <span class="subject-progress-count">${completed}/${subjectTasks.length} complete</span>
+      </div>
+      <div class="progress-track" role="progressbar" aria-label="${escapeHtml(subject.name)} task completion" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+        <span style="--progress:${percent}%;--subject-color:${subject.color}"></span>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function renderCalendar(tasks) {
+  const label = document.getElementById('calendar-month-label');
+  const grid = document.getElementById('dashboard-calendar');
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  label.textContent = calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  const deadlines = new Map();
+  tasks.filter(task => task.deadline).forEach(task => {
+    const key = getLocalDateKey(new Date(task.deadline));
+    if (!deadlines.has(key)) deadlines.set(key, []);
+    deadlines.get(key).push(task.title);
+  });
+
+  const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const todayKey = getLocalDateKey(new Date());
+  const calendarStart = new Date(year, month, 1 - firstDayOffset);
+  grid.innerHTML = '';
+
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(calendarStart);
+    date.setDate(calendarStart.getDate() + index);
+    const key = getLocalDateKey(date);
+    const taskTitles = deadlines.get(key) || [];
+    const cell = document.createElement('div');
+    const classes = ['calendar-day'];
+    if (date.getMonth() !== month) classes.push('other-month');
+    if (key === todayKey) classes.push('is-today');
+    if (taskTitles.length) classes.push('has-deadline');
+    cell.className = classes.join(' ');
+    cell.setAttribute('role', 'gridcell');
+    cell.setAttribute('aria-label', `${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}${taskTitles.length ? `, ${taskTitles.length} task deadline${taskTitles.length === 1 ? '' : 's'}: ${taskTitles.join(', ')}` : ''}`);
+    cell.innerHTML = `<span class="calendar-day-number">${date.getDate()}</span>${taskTitles.length ? '<span class="calendar-deadline-dot" aria-hidden="true"></span>' : ''}`;
+    grid.appendChild(cell);
+  }
+}
+
+function updateFocusTimer() {
+  const minutes = Math.floor(focusRemaining / 60);
+  const seconds = focusRemaining % 60;
+  document.getElementById('focus-clock').textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  document.getElementById('focus-ring').style.setProperty('--focus-progress', `${((focusDuration - focusRemaining) / focusDuration) * 100}%`);
+  const button = document.getElementById('btn-focus-toggle');
+  button.textContent = focusInterval ? 'Pause session' : focusRemaining < focusDuration ? 'Resume session' : 'Start session';
+}
+
+function finishFocusSession() {
+  window.clearInterval(focusInterval);
+  focusInterval = null;
+  focusEndsAt = null;
+  focusRemaining = 0;
+  const sessions = userSessions();
+  sessions.push({ id: id(), date: getLocalDateKey(new Date()), minutes: 25 });
+  setUserSessions(sessions);
+  updateFocusTimer();
+  document.getElementById('focus-session-status').textContent = 'Session complete. Your focus time and streak have been updated.';
+  renderDashboard();
+}
+
+function toggleFocusSession() {
+  if (focusInterval) {
+    window.clearInterval(focusInterval);
+    focusInterval = null;
+    updateFocusTimer();
+    return;
+  }
+  if (focusRemaining === 0) focusRemaining = focusDuration;
+  document.getElementById('focus-session-status').textContent = '';
+  focusInterval = window.setInterval(() => {
+    focusRemaining = Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000));
+    if (focusRemaining <= 0) finishFocusSession();
+    else updateFocusTimer();
+  }, 1000);
+  focusEndsAt = Date.now() + focusRemaining * 1000;
+  updateFocusTimer();
+}
+
+function resetFocusSession() {
+  window.clearInterval(focusInterval);
+  focusInterval = null;
+  focusEndsAt = null;
+  focusRemaining = focusDuration;
+  document.getElementById('focus-session-status').textContent = '';
+  updateFocusTimer();
 }
 
 function renderSubjects() {
@@ -489,6 +849,33 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
   }
   loadSession();
+  initializeAIChat();
+  updateFocusTimer();
+
+  document.getElementById('btn-dashboard-add-task')?.addEventListener('click', () => {
+    setView('tasks');
+    openTaskModal();
+  });
+  document.getElementById('btn-dashboard-add-subject')?.addEventListener('click', () => {
+    setView('subjects');
+    openSubjectModal();
+  });
+  document.getElementById('btn-focus-toggle')?.addEventListener('click', toggleFocusSession);
+  document.getElementById('btn-focus-reset')?.addEventListener('click', resetFocusSession);
+  document.getElementById('calendar-prev')?.addEventListener('click', () => {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    renderCalendar(userTasks());
+  });
+  document.getElementById('calendar-next')?.addEventListener('click', () => {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+    renderCalendar(userTasks());
+  });
+  document.querySelectorAll('.panel-link[data-view]').forEach(link => {
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      setView(link.dataset.view);
+    });
+  });
 
   // Auth
   document.getElementById('login-form')?.addEventListener('submit', e => {

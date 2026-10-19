@@ -1,8 +1,9 @@
-const CACHE = 'study-planner-v1';
+const CACHE = 'study-planner-v4';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './study-scene.js',
   './script.js',
   './manifest.json',
   './icons/icon-192.png'
