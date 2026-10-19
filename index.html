@@ -291,8 +291,8 @@
         <p id="subjects-empty" class="empty-msg hidden">No subjects yet. Add your first subject to get started.</p>
 
         <!-- Add/Edit Subject Modal -->
-        <div id="subject-modal" class="modal">
-          <div class="modal-inner">
+        <div id="subject-modal" class="modal" aria-hidden="true">
+          <div class="modal-inner" role="dialog" aria-modal="true" aria-labelledby="subject-modal-title" tabindex="-1">
             <h3 id="subject-modal-title">Add subject</h3>
             <form id="subject-form">
               <input type="hidden" id="subject-id">
@@ -301,8 +301,12 @@
                 <input type="text" id="subject-name" placeholder="e.g. Mathematics" required>
               </div>
               <div class="input-group">
-                <label>Color</label>
-                <div class="color-picker" id="subject-color-picker"></div>
+                <span class="input-label">Subject color</span>
+                <div class="color-picker" id="subject-color-picker" role="group" aria-label="Choose a color for this subject"></div>
+                <div class="subject-color-preview" id="subject-color-preview" aria-live="polite">
+                  <span class="subject-color-preview-dot"></span>
+                  <span class="subject-color-preview-label">Violet · subject preview</span>
+                </div>
               </div>
               <div class="modal-actions">
                 <button type="button" class="btn btn-ghost" id="subject-cancel">Cancel</button>
@@ -337,8 +341,8 @@
         <p id="tasks-empty" class="empty-msg hidden">No tasks yet. Add a task to a subject.</p>
 
         <!-- Add/Edit Task Modal -->
-        <div id="task-modal" class="modal">
-          <div class="modal-inner">
+        <div id="task-modal" class="modal" aria-hidden="true">
+          <div class="modal-inner" role="dialog" aria-modal="true" aria-labelledby="task-modal-title" tabindex="-1">
             <h3 id="task-modal-title">Add task</h3>
             <form id="task-form">
               <input type="hidden" id="task-id">

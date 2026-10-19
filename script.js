@@ -15,8 +15,13 @@ const SUBJECT_COLORS = [
   '#2d5a4a', '#c45c3e', '#5a4a8c', '#2a7a6e', '#8b5a3c',
   '#4a6b8a', '#9e3d27', '#3d7a65', '#6b4a7a', '#2d6a5a'
 ];
+const SUBJECT_COLOR_NAMES = [
+  'Forest', 'Terracotta', 'Iris', 'Lagoon', 'Cedar',
+  'Slate', 'Ember', 'Jade', 'Plum', 'Ocean'
+];
 
 let currentUser = null;
+let lastModalTrigger = null;
 let aiConversation = [];
 const focusDuration = 25 * 60;
 let focusRemaining = focusDuration;
@@ -775,14 +780,46 @@ function renderColorPicker() {
   const el = document.getElementById('subject-color-picker');
   if (!el) return;
   el.innerHTML = '';
-  SUBJECT_COLORS.forEach(c => {
+  SUBJECT_COLORS.forEach((color, index) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'color-opt';
-    b.style.background = c;
-    b.dataset.color = c;
+    b.style.backgroundColor = color;
+    b.dataset.color = color;
+    b.dataset.colorName = SUBJECT_COLOR_NAMES[index];
+    b.setAttribute('aria-label', `${SUBJECT_COLOR_NAMES[index]} subject color`);
+    b.setAttribute('aria-pressed', 'false');
+    b.title = `${SUBJECT_COLOR_NAMES[index]} · ${color}`;
     el.appendChild(b);
   });
+}
+
+function updateSubjectColorPreview(button) {
+  if (!button) return;
+  document.getElementById('subject-color-picker').style.setProperty('--preview-color', button.dataset.color);
+  const preview = document.getElementById('subject-color-preview');
+  preview.style.setProperty('--preview-color', button.dataset.color);
+  preview.querySelector('.subject-color-preview-label').textContent = `${button.dataset.colorName} · subject preview`;
+}
+
+function openModal(modal) {
+  lastModalTrigger = document.activeElement;
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+  window.requestAnimationFrame(() => {
+    modal.querySelector('.modal-inner').focus();
+  });
+}
+
+function closeModal(modal) {
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+  if (!document.querySelector('.modal.open')) document.body.classList.remove('modal-open');
+  if (lastModalTrigger instanceof HTMLElement && lastModalTrigger.isConnected) {
+    lastModalTrigger.focus();
+  }
+  lastModalTrigger = null;
 }
 
 /* ========== Modals ========== */
@@ -802,17 +839,24 @@ function openSubjectModal(editId = null) {
     if (s) {
       title.textContent = 'Edit subject';
       document.getElementById('subject-name').value = s.name;
-      document.querySelector(`.color-opt[data-color="${s.color}"]`)?.classList.add('selected');
+      const selected = document.querySelector(`.color-opt[data-color="${s.color}"]`);
+      selected?.classList.add('selected');
+      selected?.setAttribute('aria-pressed', 'true');
+      updateSubjectColorPreview(selected);
     }
   } else {
     title.textContent = 'Add subject';
-    document.querySelector(`.color-opt[data-color="${SUBJECT_COLORS[0]}"]`)?.classList.add('selected');
+    const selected = document.querySelector(`.color-opt[data-color="${SUBJECT_COLORS[0]}"]`);
+    selected?.classList.add('selected');
+    selected?.setAttribute('aria-pressed', 'true');
+    updateSubjectColorPreview(selected);
   }
-  m.classList.add('open');
+  openModal(m);
+  window.requestAnimationFrame(() => document.getElementById('subject-name').focus());
 }
 
 function closeSubjectModal() {
-  document.getElementById('subject-modal').classList.remove('open');
+  closeModal(document.getElementById('subject-modal'));
 }
 
 function openTaskModal(editId = null) {
@@ -837,11 +881,12 @@ function openTaskModal(editId = null) {
   } else {
     title.textContent = 'Add task';
   }
-  m.classList.add('open');
+  openModal(m);
+  window.requestAnimationFrame(() => document.getElementById('task-title').focus());
 }
 
 function closeTaskModal() {
-  document.getElementById('task-modal').classList.remove('open');
+  closeModal(document.getElementById('task-modal'));
 }
 
 /* ========== Views ========== */
@@ -1028,6 +1073,10 @@ function setSearchActiveOption(index) {
 /* ========== Event wiring ========== */
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme(localStorage.getItem(STORAGE.theme) || 'dark');
+  document.body.append(
+    document.getElementById('subject-modal'),
+    document.getElementById('task-modal')
+  );
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(error => {
       console.warn('Offline support could not be enabled.', error);
@@ -1073,6 +1122,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!event.target.closest('.global-search')) closeGlobalSearch();
   });
   document.addEventListener('keydown', event => {
+    const activeModal = document.querySelector('.modal.open');
+    if (activeModal) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (activeModal.id === 'subject-modal') closeSubjectModal();
+        else closeTaskModal();
+        return;
+      }
+      if (event.key === 'Tab') {
+        const focusable = [...activeModal.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')]
+          .filter(element => element.getClientRects().length > 0);
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+      return;
+    }
+
     const target = event.target;
     const isTyping = target instanceof HTMLElement
       && (target.isContentEditable || target.matches('input, textarea, select'));
@@ -1196,8 +1269,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('subject-color-picker')?.addEventListener('click', e => {
     const t = e.target.closest('.color-opt');
     if (!t) return;
-    document.querySelectorAll('.color-opt').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.color-opt').forEach(b => {
+      b.classList.remove('selected');
+      b.setAttribute('aria-pressed', 'false');
+    });
     t.classList.add('selected');
+    t.setAttribute('aria-pressed', 'true');
+    updateSubjectColorPreview(t);
   });
 
   document.getElementById('subjects-list')?.addEventListener('click', e => {
